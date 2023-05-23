@@ -13,7 +13,7 @@ CLASS z2ui5_lcl_utility DEFINITION INHERITING FROM cx_no_check.
         gen_type       TYPE string,
         gen_kind       TYPE string,
       END OF ty_attri.
-    TYPES ty_T_attri TYPE STANDARD TABLE OF ty_attri WITH EMPTY KEY.
+    TYPES ty_T_attri TYPE STANDARD TABLE OF ty_attri WITH DEFAULT KEY.
 
     DATA:
       BEGIN OF ms_error,
@@ -139,7 +139,9 @@ ENDCLASS.
 CLASS z2ui5_lcl_utility IMPLEMENTATION.
 
   METHOD get_trim_upper.
-    result = CONV #( val ).
+    DATA temp5 TYPE string.
+    temp5 = val.
+    result = temp5.
     result = to_upper( shift_left( shift_right( result ) ) ).
   ENDMETHOD.
 
@@ -164,8 +166,14 @@ CLASS z2ui5_lcl_utility IMPLEMENTATION.
 
   METHOD get_abap_2_json.
 
-    IF check_is_boolean( val ).
-      result = COND #( WHEN val = abap_true THEN `true` ELSE `false` ).
+    IF check_is_boolean( val ) IS NOT INITIAL.
+      DATA temp6 TYPE string.
+      IF val = abap_true.
+        temp6 = `true`.
+      ELSE.
+        temp6 = `false`.
+      ENDIF.
+      result = temp6.
     ELSE.
       result = |"{ escape( val = val  format = cl_abap_format=>e_json_string ) }"|.
     ENDIF.
@@ -176,7 +184,10 @@ CLASS z2ui5_lcl_utility IMPLEMENTATION.
   METHOD check_is_boolean.
 
     TRY.
-        DATA(lo_ele) = CAST cl_abap_elemdescr( cl_abap_elemdescr=>describe_by_data( val ) ).
+        DATA temp7 TYPE REF TO cl_abap_elemdescr.
+        temp7 ?= cl_abap_elemdescr=>describe_by_data( val ).
+        DATA lo_ele LIKE temp7.
+        lo_ele = temp7.
         CASE lo_ele->get_relative_name( ).
           WHEN `ABAP_BOOL` OR `ABAP_BOOLEAN` OR `XSDBOOLEAN`.
             result = abap_true.
@@ -189,8 +200,14 @@ CLASS z2ui5_lcl_utility IMPLEMENTATION.
 
   METHOD get_json_boolean.
 
-    IF check_is_boolean( val ).
-      result = COND #( WHEN val = abap_true THEN `true` ELSE `false` ).
+    IF check_is_boolean( val ) IS NOT INITIAL.
+      DATA temp8 TYPE string.
+      IF val = abap_true.
+        temp8 = `true`.
+      ELSE.
+        temp8 = `false`.
+      ENDIF.
+      result = temp8.
     ELSE.
       result = val.
     ENDIF.
@@ -224,7 +241,8 @@ CLASS z2ui5_lcl_utility IMPLEMENTATION.
 
           CATCH cx_sy_dyn_call_illegal_class.
 
-            DATA(lv_fm) = `GUID_CREATE`.
+            DATA lv_fm TYPE string.
+            lv_fm = `GUID_CREATE`.
             CALL FUNCTION lv_fm
               IMPORTING
                 ev_guid_32 = uuid.
@@ -249,17 +267,44 @@ CLASS z2ui5_lcl_utility IMPLEMENTATION.
 
   METHOD get_header_val.
 
-    result  = to_lower( z2ui5_cl_http_handler=>client-t_header[ name = v ]-value ).
+    DATA temp9 LIKE LINE OF z2ui5_cl_http_handler=>client-t_header.
+    DATA temp10 LIKE sy-tabix.
+    temp10 = sy-tabix.
+    READ TABLE z2ui5_cl_http_handler=>client-t_header WITH KEY name = v INTO temp9.
+    sy-tabix = temp10.
+    IF sy-subrc <> 0.
+      RAISE EXCEPTION TYPE cx_sy_itab_line_not_found.
+    ENDIF.
+    result  = to_lower( temp9-value ).
 
   ENDMETHOD.
 
 
   METHOD get_param_val.
 
-    DATA(lt_param) = VALUE z2ui5_if_client=>ty_t_name_value( LET tab = z2ui5_cl_http_handler=>client-t_param IN FOR row IN tab
-                                 ( name = to_upper( row-name ) value = to_upper( row-value ) ) ).
+    DATA temp11 TYPE z2ui5_if_client=>ty_t_name_value.
+    CLEAR temp11.
+    DATA tab TYPE z2ui5_if_client=>ty_t_name_value.
+    tab = z2ui5_cl_http_handler=>client-t_param.
+    DATA row LIKE LINE OF tab.
+    LOOP AT tab INTO row.
+      DATA temp12 LIKE LINE OF temp11.
+      temp12-name = to_upper( row-name ).
+      temp12-value = to_upper( row-value ).
+      INSERT temp12 INTO TABLE temp11.
+    ENDLOOP.
+    DATA lt_param LIKE temp11.
+    lt_param = temp11.
     TRY.
-        result = lt_param[ name = get_trim_upper( v ) ]-value.
+        DATA temp13 LIKE LINE OF lt_param.
+        DATA temp14 LIKE sy-tabix.
+        temp14 = sy-tabix.
+        READ TABLE lt_param WITH KEY name = get_trim_upper( v ) INTO temp13.
+        sy-tabix = temp14.
+        IF sy-subrc <> 0.
+          RAISE EXCEPTION TYPE cx_sy_itab_line_not_found.
+        ENDIF.
+        result = temp13-value.
       CATCH cx_root.
     ENDTRY.
 
@@ -268,11 +313,15 @@ CLASS z2ui5_lcl_utility IMPLEMENTATION.
 
   METHOD get_t_attri_by_ref.
 
-    DATA(lt_attri) = CAST cl_abap_classdescr( cl_abap_objectdescr=>describe_by_object_ref( io_app ) )->attributes.
+    DATA temp15 TYPE REF TO cl_abap_classdescr.
+    temp15 ?= cl_abap_objectdescr=>describe_by_object_ref( io_app ).
+    DATA lt_attri LIKE temp15->attributes.
+    lt_attri = temp15->attributes.
 
     DELETE lt_attri WHERE visibility <> cl_abap_classdescr=>public.
 
-    LOOP AT lt_attri INTO DATA(ls_attri)
+    DATA ls_attri LIKE LINE OF lt_attri.
+    LOOP AT lt_attri INTO ls_attri
       WHERE type_kind = cl_abap_classdescr=>typekind_struct2
          OR type_kind = cl_abap_classdescr=>typekind_struct1.
 
@@ -286,17 +335,24 @@ CLASS z2ui5_lcl_utility IMPLEMENTATION.
 
     LOOP AT lt_attri INTO ls_attri.
 
-      DATA(ls_attri2) = VALUE ty_attri( ).
-      ls_attri2 = CORRESPONDING #( ls_attri ).
+      DATA temp16 TYPE ty_attri.
+      CLEAR temp16.
+      DATA ls_attri2 LIKE temp16.
+      ls_attri2 = temp16.
+      MOVE-CORRESPONDING ls_attri TO ls_attri2.
 
       FIELD-SYMBOLS <any> TYPE any.
       UNASSIGN <any>.
-      DATA(lv_assign) = `IO_APP->` && ls_attri-name.
+      DATA lv_assign TYPE string.
+      lv_assign = `IO_APP->` && ls_attri-name.
       ASSIGN (lv_assign) TO <any>.
-      DATA(lo_descr) = cl_abap_datadescr=>describe_by_data( <any> ).
+      DATA lo_descr TYPE REF TO cl_abap_typedescr.
+      lo_descr = cl_abap_datadescr=>describe_by_data( <any> ).
       CASE lo_descr->kind.
         WHEN lo_descr->kind_elem.
-          ls_attri2-type =  CAST cl_abap_elemdescr( lo_descr )->get_relative_name( ).
+          DATA temp17 TYPE REF TO cl_abap_elemdescr.
+          temp17 ?= lo_descr.
+          ls_attri2-type =  temp17->get_relative_name( ).
       ENDCASE.
 
       APPEND ls_attri2 TO result.
@@ -309,24 +365,37 @@ CLASS z2ui5_lcl_utility IMPLEMENTATION.
     CONSTANTS c_prefix TYPE string VALUE `IO_APP->`.
     FIELD-SYMBOLS <attribute> TYPE any.
 
-    DATA(lv_name) = c_prefix && to_upper( iv_attri ).
+    DATA lv_name TYPE string.
+    lv_name = c_prefix && to_upper( iv_attri ).
     ASSIGN (lv_name) TO <attribute>.
-    raise( when = xsdbool( sy-subrc <> 0 ) ).
+    raise( when = boolc( sy-subrc <> 0 ) ).
 
-    DATA(lo_type) = cl_abap_structdescr=>describe_by_data( <attribute> ).
-    DATA(lo_struct) = CAST cl_abap_structdescr( lo_type ).
+    DATA lo_type TYPE REF TO cl_abap_typedescr.
+    lo_type = cl_abap_structdescr=>describe_by_data( <attribute> ).
+    DATA temp2 TYPE REF TO cl_abap_structdescr.
+    temp2 ?= lo_type.
+    DATA lo_struct LIKE temp2.
+    lo_struct = temp2.
 
-    LOOP AT lo_struct->get_components( ) REFERENCE INTO DATA(lr_comp).
+    DATA temp3 TYPE abap_component_tab.
+    temp3 = lo_struct->get_components( ).
+    DATA temp1 LIKE LINE OF temp3.
+    DATA lr_comp LIKE REF TO temp1.
+    LOOP AT temp3 REFERENCE INTO lr_comp.
 
-      DATA(lv_element) = iv_attri && `-` && lr_comp->name.
+      DATA lv_element TYPE string.
+      lv_element = iv_attri && `-` && lr_comp->name.
 
       IF lr_comp->as_include = abap_true.
         INSERT LINES OF _get_t_attri_by_struc( io_app   = io_app
                                       iv_attri = lv_element ) INTO TABLE result.
 
       ELSE.
-        INSERT VALUE #( name = lv_element
-                        type_kind = lr_comp->type->type_kind ) INTO TABLE result.
+        DATA temp4 TYPE abap_attrdescr.
+        CLEAR temp4.
+        temp4-name = lv_element.
+        temp4-type_kind = lr_comp->type->type_kind.
+        INSERT temp4 INTO TABLE result.
       ENDIF.
 
     ENDLOOP.
@@ -343,7 +412,7 @@ CLASS z2ui5_lcl_utility IMPLEMENTATION.
 
     FIELD-SYMBOLS <object> TYPE any.
     ASSIGN object->* TO <object>.
-    raise( when = xsdbool( sy-subrc <> 0 ) ).
+    raise( when = boolc( sy-subrc <> 0 ) ).
 
     CALL TRANSFORMATION id
        SOURCE data = <object>
@@ -359,24 +428,35 @@ CLASS z2ui5_lcl_utility IMPLEMENTATION.
 
     FIELD-SYMBOLS <lt_from> TYPE ty_t_ref.
     ASSIGN ir_tab_from->* TO <lt_from>.
-    raise( when = xsdbool( sy-subrc <> 0 ) ).
+    raise( when = boolc( sy-subrc <> 0 ) ).
 
     CLEAR t_result.
 
-    DATA(lo_tab) = CAST cl_abap_tabledescr( cl_abap_datadescr=>describe_by_data( t_result ) ).
-    DATA(lo_struc) = CAST cl_abap_structdescr( lo_tab->get_table_line_type( ) ).
-    DATA(lt_components) = lo_struc->get_components( ).
+    DATA temp2 TYPE REF TO cl_abap_tabledescr.
+    temp2 ?= cl_abap_datadescr=>describe_by_data( t_result ).
+    DATA lo_tab LIKE temp2.
+    lo_tab = temp2.
+    DATA temp3 TYPE REF TO cl_abap_structdescr.
+    temp3 ?= lo_tab->get_table_line_type( ).
+    DATA lo_struc LIKE temp3.
+    lo_struc = temp3.
+    DATA lt_components TYPE abap_component_tab.
+    lt_components = lo_struc->get_components( ).
 
-    LOOP AT <lt_from> INTO DATA(lr_from).
+    DATA lr_from LIKE LINE OF <lt_from>.
+    LOOP AT <lt_from> INTO lr_from.
 
       DATA lr_row TYPE REF TO data.
       CREATE DATA lr_row LIKE LINE OF t_result.
-      ASSIGN lr_row->* TO FIELD-SYMBOL(<row>).
+      FIELD-SYMBOLS <row> TYPE any.
+      ASSIGN lr_row->* TO <row>.
 
-      ASSIGN lr_from->* TO FIELD-SYMBOL(<row_ui5>).
-      raise( when = xsdbool( sy-subrc <> 0 ) ).
+      FIELD-SYMBOLS <row_ui5> TYPE any.
+      ASSIGN lr_from->* TO <row_ui5>.
+      raise( when = boolc( sy-subrc <> 0 ) ).
 
-      LOOP AT lt_components INTO DATA(ls_comp).
+      DATA ls_comp LIKE LINE OF lt_components.
+      LOOP AT lt_components INTO ls_comp.
 
         FIELD-SYMBOLS <comp> TYPE data.
         ASSIGN COMPONENT ls_comp-name OF STRUCTURE <row> TO <comp>.
@@ -390,7 +470,8 @@ CLASS z2ui5_lcl_utility IMPLEMENTATION.
           EXIT.
         ENDIF.
 
-        ASSIGN <comp_ui5>->* TO FIELD-SYMBOL(<ls_data_ui5>).
+        FIELD-SYMBOLS <ls_data_ui5> TYPE any.
+        ASSIGN <comp_ui5>->* TO <ls_data_ui5>.
         IF sy-subrc = 0.
           <comp> = <ls_data_ui5>.
         ENDIF.
@@ -413,7 +494,8 @@ CLASS z2ui5_lcl_utility IMPLEMENTATION.
 
     IF ms_error-x_root IS NOT INITIAL.
       result = ms_error-x_root->get_text( ).
-      DATA(error) = abap_true.
+      DATA error LIKE abap_true.
+      error = abap_true.
     ELSEIF ms_error-s_msg-message IS NOT INITIAL.
       result = ms_error-s_msg-message.
       error = abap_true.
@@ -444,7 +526,7 @@ CLASS z2ui5_lcl_utility_tree_json DEFINITION.
     DATA mo_parent TYPE REF TO z2ui5_lcl_utility_tree_json.
     DATA mv_name   TYPE string.
     DATA mv_value  TYPE string.
-    DATA mt_values TYPE STANDARD TABLE OF REF TO z2ui5_lcl_utility_tree_json WITH EMPTY KEY.
+    DATA mt_values TYPE STANDARD TABLE OF REF TO z2ui5_lcl_utility_tree_json WITH DEFAULT KEY.
     DATA mv_check_list TYPE abap_bool.
     DATA mr_actual TYPE REF TO data.
     DATA mv_apost_active TYPE abap_bool.
@@ -552,7 +634,8 @@ CLASS z2ui5_lcl_utility_tree_json IMPLEMENTATION.
 
   METHOD add_attribute.
 
-    DATA(lo_attri) = new( io_root = mo_root iv_name = n ).
+    DATA lo_attri TYPE REF TO z2ui5_lcl_utility_tree_json.
+    lo_attri = new( io_root = mo_root iv_name = n ).
 
     IF apos_active = abap_false.
       lo_attri->mv_value = v.
@@ -589,10 +672,16 @@ CLASS z2ui5_lcl_utility_tree_json IMPLEMENTATION.
   METHOD add_attribute_struc.
 
     FIELD-SYMBOLS <value> TYPE any.
-    DATA(lo_struc) = CAST cl_abap_structdescr( cl_abap_datadescr=>describe_by_data( val ) ).
-    DATA(lt_comp) = lo_struc->get_components( ).
+    DATA temp18 TYPE REF TO cl_abap_structdescr.
+    temp18 ?= cl_abap_datadescr=>describe_by_data( val ).
+    DATA lo_struc LIKE temp18.
+    lo_struc = temp18.
+    DATA lt_comp TYPE abap_component_tab.
+    lt_comp = lo_struc->get_components( ).
 
-    LOOP AT lt_comp REFERENCE INTO DATA(lr_comp).
+    DATA temp19 LIKE LINE OF lt_comp.
+    DATA lr_comp LIKE REF TO temp19.
+    LOOP AT lt_comp REFERENCE INTO lr_comp.
       ASSIGN COMPONENT lr_comp->name OF STRUCTURE val TO <value>.
       add_attribute( n = lr_comp->name v = <value> ).
     ENDLOOP.
@@ -603,8 +692,13 @@ CLASS z2ui5_lcl_utility_tree_json IMPLEMENTATION.
 
   METHOD add_attribute_object.
 
-    DATA(lo_attri) = new( io_root = mo_root iv_name = name ).
-    mt_values = VALUE #( BASE mt_values ( lo_attri ) ).
+    DATA lo_attri TYPE REF TO z2ui5_lcl_utility_tree_json.
+    lo_attri = new( io_root = mo_root iv_name = name ).
+    DATA temp20 LIKE mt_values.
+    CLEAR temp20.
+    temp20 = mt_values.
+    INSERT lo_attri INTO TABLE temp20.
+    mt_values = temp20.
     lo_attri->mo_parent = me.
     result = lo_attri.
 
@@ -613,25 +707,34 @@ CLASS z2ui5_lcl_utility_tree_json IMPLEMENTATION.
 
   METHOD add_list_list.
 
-    result = add_attribute_list( CONV string( lines( mt_values ) ) ).
+    DATA temp22 TYPE string.
+    temp22 = lines( mt_values ).
+    result = add_attribute_list( temp22 ).
 
   ENDMETHOD.
 
 
   METHOD add_list_object.
 
-    result = add_attribute_object( CONV string( lines( mt_values ) ) ).
+    DATA temp23 TYPE string.
+    temp23 = lines( mt_values ).
+    result = add_attribute_object( temp23 ).
 
   ENDMETHOD.
 
 
   METHOD add_list_val.
 
-    DATA(lo_attri) = new( io_root = mo_root iv_name = lines( mt_values ) ).
+    DATA lo_attri TYPE REF TO z2ui5_lcl_utility_tree_json.
+    lo_attri = new( io_root = mo_root iv_name = lines( mt_values ) ).
     lo_attri->mv_value = v.
     lo_attri->mv_apost_active = abap_true.
 
-    mt_values = VALUE #( BASE mt_values ( lo_attri ) ).
+    DATA temp24 LIKE mt_values.
+    CLEAR temp24.
+    temp24 = mt_values.
+    INSERT lo_attri INTO TABLE temp24.
+    mt_values = temp24.
     lo_attri->mo_parent = me.
     result = lo_attri.
     result = me.
@@ -648,12 +751,14 @@ CLASS z2ui5_lcl_utility_tree_json IMPLEMENTATION.
 
   METHOD factory.
 
-    result = NEW #( ).
+    CREATE OBJECT result.
     result->mo_root = result.
 
+    DATA temp26 TYPE string.
+    temp26 = iv_json.
     /ui2/cl_json=>deserialize(
         EXPORTING
-            json         = CONV string( iv_json )
+            json         = temp26
             assoc_arrays = abap_true
         "    conversion_exits = abap_true
         CHANGING
@@ -664,9 +769,11 @@ CLASS z2ui5_lcl_utility_tree_json IMPLEMENTATION.
 
   METHOD new.
 
-    result = NEW #( ).
+    CREATE OBJECT result.
     result->mo_root = io_root.
-    result->mv_name = CONV string( iv_name ).
+    DATA temp27 TYPE string.
+    temp27 = iv_name.
+    result->mv_name = temp27.
 
   ENDMETHOD.
 
@@ -674,15 +781,17 @@ CLASS z2ui5_lcl_utility_tree_json IMPLEMENTATION.
 
     CONSTANTS c_prefix TYPE string VALUE `MR_ACTUAL->`.
 
-    z2ui5_lcl_utility=>raise( when = xsdbool( mr_actual IS INITIAL ) ).
+    z2ui5_lcl_utility=>raise( when = boolc( mr_actual IS INITIAL ) ).
 
-    DATA(lo_attri) = new( io_root = mo_root iv_name = name ).
+    DATA lo_attri TYPE REF TO z2ui5_lcl_utility_tree_json.
+    lo_attri = new( io_root = mo_root iv_name = name ).
 
     FIELD-SYMBOLS <attribute> TYPE any.
-    DATA(lv_name) = c_prefix && replace( val = name sub = `-` with = `_` occ = 0 ).
+    DATA lv_name TYPE string.
+    lv_name = c_prefix && replace( val = name sub = `-` with = `_` occ = 0 ).
     " DATA(lv_name) = c_prefix && replace( val = name sub = `-` with = `_` occ = 0 ).
     ASSIGN (lv_name) TO <attribute>.
-    z2ui5_lcl_utility=>raise( when = xsdbool( sy-subrc <> 0 ) ).
+    z2ui5_lcl_utility=>raise( when = boolc( sy-subrc <> 0 ) ).
 
     lo_attri->mr_actual = <attribute>.
     lo_attri->mo_parent = me.
@@ -697,7 +806,7 @@ CLASS z2ui5_lcl_utility_tree_json IMPLEMENTATION.
 
     FIELD-SYMBOLS <attribute> TYPE any.
     ASSIGN mr_actual->* TO <attribute>.
-    z2ui5_lcl_utility=>raise( when = xsdbool( sy-subrc <> 0 ) v = `Value of Attribute in JSON not found` ).
+    z2ui5_lcl_utility=>raise( when = boolc( sy-subrc <> 0 ) v = `Value of Attribute in JSON not found` ).
 
     result = <attribute>.
 
@@ -713,19 +822,34 @@ CLASS z2ui5_lcl_utility_tree_json IMPLEMENTATION.
 
   METHOD wrap_json.
 
-    result = SWITCH #( mv_check_list WHEN abap_true  THEN |[ { iv_text }]| ELSE `{` && iv_text && `}` ).
+    DATA temp28 TYPE string.
+    CASE mv_check_list.
+      WHEN abap_true.
+        temp28 = |[ { iv_text }]|.
+      WHEN OTHERS.
+        temp28 = `{` && iv_text && `}`.
+    ENDCASE.
+    result = temp28.
 
   ENDMETHOD.
 
   METHOD quote_json.
 
-    result = SWITCH #( iv_cond WHEN abap_true THEN `"` && iv_text && `"` ELSE iv_text ).
+    DATA temp29 TYPE string.
+    CASE iv_cond.
+      WHEN abap_true.
+        temp29 = `"` && iv_text && `"`.
+      WHEN OTHERS.
+        temp29 = iv_text.
+    ENDCASE.
+    result = temp29.
 
   ENDMETHOD.
 
   METHOD stringify.
 
-    LOOP AT mt_values INTO DATA(lo_attri).
+    DATA lo_attri LIKE LINE OF mt_values.
+    LOOP AT mt_values INTO lo_attri.
 
       IF sy-tabix > 1.
         result = result && |,|.
@@ -740,7 +864,7 @@ CLASS z2ui5_lcl_utility_tree_json IMPLEMENTATION.
         result = result && lo_attri->stringify( ).
       ELSE.
         result = result &&
-           quote_json( iv_cond = xsdbool( lo_attri->mv_apost_active = abap_true OR lo_attri->mv_value IS INITIAL )
+           quote_json( iv_cond = boolc( lo_attri->mv_apost_active = abap_true OR lo_attri->mv_value IS INITIAL )
                        iv_text = lo_attri->mv_value ).
       ENDIF.
 
@@ -934,9 +1058,11 @@ CLASS z2ui5_lcl_fw_app IMPLEMENTATION.
 
   METHOD factory_error.
 
-    result = NEW #( ).
+    CREATE OBJECT result.
     result->ms_error-x_error = error.
-    result->ms_error-app     = CAST #( app ).
+    DATA temp30 TYPE REF TO z2ui5_if_app.
+    temp30 ?= app.
+    result->ms_error-app     = temp30.
 
   ENDMETHOD.
 
@@ -983,7 +1109,8 @@ CLASS z2ui5_lcl_fw_app IMPLEMENTATION.
                 ms_home-class_value_state = `Success`.
                 ms_home-class_editable = abap_false.
 
-              CATCH cx_root INTO DATA(lx) ##CATCH_ALL.
+                DATA lx TYPE REF TO cx_root.
+              CATCH cx_root INTO lx.
                 ms_home-class_value_state_text = lx->get_text( ).
                 ms_home-class_value_state = `Warning`.
                 client->popup_message_box( text = ms_home-class_value_state_text type = `error` ).
@@ -1018,24 +1145,30 @@ CLASS z2ui5_lcl_fw_app IMPLEMENTATION.
 
     IF ms_error-x_error IS BOUND.
 
+      DATA lv_prog TYPE syrepid.
+      DATA lv_incl TYPE syrepid.
+      DATA lv_line TYPE i.
       ms_error-x_error->get_source_position(
         IMPORTING
-          program_name = DATA(lv_prog)
-          include_name = DATA(lv_incl)
-          source_line  = DATA(lv_line)
+          program_name = lv_prog
+          include_name = lv_incl
+          source_line  = lv_line
       ).
 
       IF  client->get_app( client->get( )-id_prev_app ) IS BOUND.
-        DATA(lv_check_back) = `true`.
+        DATA lv_check_back TYPE string.
+        lv_check_back = `true`.
       ELSE.
         lv_check_back = `false`.
       ENDIF.
 
-      DATA(lv_descr) = ms_error-x_error->get_text( ) &&
+      DATA lv_descr TYPE string.
+      lv_descr = ms_error-x_error->get_text( ) &&
             ` -------------------------------------------------------------------------------------------- Source Code Position: ` &&
             lv_prog && ` / ` && lv_incl && ` / ` && lv_line && ` `.
 
-      DATA(lv_xml_error) = `<mvc:View controllerName="z2ui5_controller" displayBlock="true" height="100%" xmlns:core="sap.ui.core" xmlns:l="sap.ui.layout" xmlns:html="http://www.w3.org/1999/xhtml" xmlns:f="sap.ui.layout.form" xmlns:mvc="sap.ui.core.mv` &&
+      DATA lv_xml_error TYPE string.
+      lv_xml_error = `<mvc:View controllerName="z2ui5_controller" displayBlock="true" height="100%" xmlns:core="sap.ui.core" xmlns:l="sap.ui.layout" xmlns:html="http://www.w3.org/1999/xhtml" xmlns:f="sap.ui.layout.form" xmlns:mvc="sap.ui.core.mv` &&
   `c" xmlns:editor="sap.ui.codeeditor" xmlns:ui="sap.ui.table" xmlns="sap.m" xmlns:uxap="sap.uxap" xmlns:mchart="sap.suite.ui.microchart" xmlns:z2ui5="z2ui5" xmlns:webc="sap.ui.webc.main" xmlns:text="sap.ui.richtexteditor" > <Shell> <MessagePage ` && |\n|
   &&
                            `  description="` &&  lv_descr && `" ` && |\n|  &&
@@ -1052,25 +1185,49 @@ CLASS z2ui5_lcl_fw_app IMPLEMENTATION.
                            `  type="Emphasized" enabled="` && lv_check_back && `"` && |\n|  &&
                            ` /></buttons></MessagePage></Shell></mvc:View>`.
 
-      client->set_next( VALUE #( xml_main = lv_xml_error ) ).
+      DATA temp5 TYPE z2ui5_if_client=>ty_s_next.
+      CLEAR temp5.
+      temp5-xml_main = lv_xml_error.
+      client->set_next( temp5 ).
       RETURN.
     ENDIF.
 
     TRY.
-        DATA(lv_url) = to_lower( z2ui5_cl_http_handler=>client-t_header[ name = `referer` ]-value ).
-        DATA(lv_path_info) = to_lower( z2ui5_cl_http_handler=>client-t_header[ name = `~path_info` ]-value ).
+        DATA lv_url TYPE string.
+        DATA temp4 LIKE LINE OF z2ui5_cl_http_handler=>client-t_header.
+        DATA temp8 LIKE sy-tabix.
+        temp8 = sy-tabix.
+        READ TABLE z2ui5_cl_http_handler=>client-t_header WITH KEY name = `referer` INTO temp4.
+        sy-tabix = temp8.
+        IF sy-subrc <> 0.
+          RAISE EXCEPTION TYPE cx_sy_itab_line_not_found.
+        ENDIF.
+        lv_url = to_lower( temp4-value ).
+        DATA lv_path_info TYPE string.
+        DATA temp9 LIKE LINE OF z2ui5_cl_http_handler=>client-t_header.
+        DATA temp10 LIKE sy-tabix.
+        temp10 = sy-tabix.
+        READ TABLE z2ui5_cl_http_handler=>client-t_header WITH KEY name = `~path_info` INTO temp9.
+        sy-tabix = temp10.
+        IF sy-subrc <> 0.
+          RAISE EXCEPTION TYPE cx_sy_itab_line_not_found.
+        ENDIF.
+        lv_path_info = to_lower( temp9-value ).
         REPLACE lv_path_info IN lv_url WITH ``.
-        SPLIT lv_url AT '?' INTO lv_url DATA(lv_params).
+        DATA lv_params TYPE string.
+        SPLIT lv_url AT '?' INTO lv_url lv_params.
 
         SHIFT lv_url RIGHT DELETING TRAILING `/`.
-        DATA(lv_link) = lv_url && `/` && to_lower( ms_home-classname ).
+        DATA lv_link TYPE string.
+        lv_link = lv_url && `/` && to_lower( ms_home-classname ).
         IF lv_params IS NOT INITIAL.
           lv_link = lv_link  && `?` && lv_params.
         ENDIF.
       CATCH cx_root.
     ENDTRY.
 
-    DATA(lv_xml_main) = `<mvc:View controllerName="z2ui5_controller" displayBlock="true" height="100%" xmlns:core="sap.ui.core" xmlns:l="sap.ui.layout" xmlns:html="http://www.w3.org/1999/xhtml" xmlns:f="sap.ui.layout.form" xmlns:mvc="sap.ui.core.mvc` &&
+    DATA lv_xml_main TYPE string.
+    lv_xml_main = `<mvc:View controllerName="z2ui5_controller" displayBlock="true" height="100%" xmlns:core="sap.ui.core" xmlns:l="sap.ui.layout" xmlns:html="http://www.w3.org/1999/xhtml" xmlns:f="sap.ui.layout.form" xmlns:mvc="sap.ui.core.mvc` &&
 `" xmlns:editor="sap.ui.codeeditor" xmlns:ui="sap.ui.table" xmlns="sap.m" xmlns:uxap="sap.uxap" xmlns:mchart="sap.suite.ui.microchart" xmlns:z2ui5="z2ui5" xmlns:webc="sap.ui.webc.main" xmlns:text="sap.ui.richtexteditor" > <Shell> <Page ` && |\n|  &&
                         `  showNavButton="false" ` && |\n|  &&
                         `  class="sapUiContentPadding sapUiResponsivePadding--subHeader sapUiResponsivePadding--content sapUiResponsivePadding--footer" ` && |\n|  &&
@@ -1146,7 +1303,7 @@ CLASS z2ui5_lcl_fw_app IMPLEMENTATION.
        `  text="Link to the Application" ` && |\n|  &&
        `  target="_blank" ` && |\n|  &&
        `  href="` && escape( val = lv_link format = cl_abap_format=>e_xml_attr ) && `" ` && |\n|  &&
-       `  enabled="` && z2ui5_lcl_utility=>get_json_boolean( xsdbool( ms_home-class_editable = abap_false ) ) && `" ` && |\n|  &&
+       `  enabled="` && z2ui5_lcl_utility=>get_json_boolean( boolc( ms_home-class_editable = abap_false ) ) && `" ` && |\n|  &&
        ` /></f:content></f:SimpleForm>`.
 
 
@@ -1159,7 +1316,8 @@ CLASS z2ui5_lcl_fw_app IMPLEMENTATION.
     DATA li_app TYPE REF TO z2ui5_if_app.
     TRY.
         CREATE OBJECT li_app TYPE (`Z2UI5_CL_APP_DEMO_00`).
-        DATA(lv_check_demo) = abap_true.
+        DATA lv_check_demo LIKE abap_true.
+        lv_check_demo = abap_true.
       CATCH cx_root.
         lv_check_demo = abap_false.
     ENDTRY.
@@ -1169,13 +1327,22 @@ CLASS z2ui5_lcl_fw_app IMPLEMENTATION.
       `  </link> </MessageStrip>`.
     ENDIF.
 
+    DATA temp6 TYPE string.
+    IF lv_check_demo = abap_true.
+      temp6 = `true`.
+    ELSE.
+      temp6 = `false`.
+    ENDIF.
     lv_xml_main = lv_xml_main && ` <f:content ` && |\n|  &&
     ` > <Label/><Button ` && |\n|  &&
     `  press="` && client->_event( `DEMOS` ) && `" ` && |\n|  &&
-    `  text="Continue..." enabled="` && COND #( WHEN lv_check_demo = abap_true THEN `true` ELSE `false` ) && |" \n|  &&
+    `  text="Continue..." enabled="` && temp6 && |" \n|  &&
     ` /></f:content></f:SimpleForm></l:content></l:Grid></Page></Shell></mvc:View>`.
 
-    client->set_next( VALUE #( xml_main = lv_xml_main ) ).
+    DATA temp7 TYPE z2ui5_if_client=>ty_s_next.
+    CLEAR temp7.
+    temp7-xml_main = lv_xml_main.
+    client->set_next( temp7 ).
 
   ENDMETHOD.
 
@@ -1185,7 +1352,8 @@ CLASS z2ui5_lcl_fw_db IMPLEMENTATION.
 
   METHOD load_app.
 
-    DATA(ls_db) = read( id ).
+    DATA ls_db TYPE z2ui5_t_draft.
+    ls_db = read( id ).
 
     z2ui5_lcl_utility=>trans_xml_2_object(
       EXPORTING
@@ -1197,28 +1365,39 @@ CLASS z2ui5_lcl_fw_db IMPLEMENTATION.
 
   METHOD create.
 
-    DATA(lo_app) = CAST object( db-o_app ) ##NEEDED.
+    DATA temp8 TYPE REF TO object.
+    temp8 ?= db-o_app.
+    DATA lo_app LIKE temp8.
+    lo_app = temp8.
 
-    LOOP AT db-t_attri REFERENCE INTO DATA(lr_attri) WHERE gen_type IS NOT INITIAL.
+    DATA temp9 LIKE LINE OF db-t_attri.
+    DATA lr_attri LIKE REF TO temp9.
+    LOOP AT db-t_attri REFERENCE INTO lr_attri WHERE gen_type IS NOT INITIAL.
 
       FIELD-SYMBOLS <attribute> TYPE any.
-      DATA(lv_name) = 'LO_APP->' && to_upper( lr_attri->name ).
+      DATA lv_name TYPE string.
+      lv_name = 'LO_APP->' && to_upper( lr_attri->name ).
       ASSIGN (lv_name) TO <attribute>.
       CLEAR <attribute>.
 
     ENDLOOP.
 
-    DATA(ls_db) = VALUE z2ui5_t_draft(
-        uuid       = id
-        uuid_prev     = db-id_prev
-        uuid_prev_app = db-id_prev_app
-        uuid_prev_app_stack = db-id_prev_app_stack
-        uname      = z2ui5_lcl_utility=>get_user_tech( )
-        timestampl = z2ui5_lcl_utility=>get_timestampl( )
-        data       = z2ui5_lcl_utility=>trans_object_2_xml( REF #( db ) ) ).
+    DATA temp10 LIKE REF TO db.
+    GET REFERENCE OF db INTO temp10.
+DATA temp11 TYPE z2ui5_t_draft.
+CLEAR temp11.
+temp11-uuid = id.
+temp11-uuid_prev = db-id_prev.
+temp11-uuid_prev_app = db-id_prev_app.
+temp11-uuid_prev_app_stack = db-id_prev_app_stack.
+temp11-uname = z2ui5_lcl_utility=>get_user_tech( ).
+temp11-timestampl = z2ui5_lcl_utility=>get_timestampl( ).
+temp11-data = z2ui5_lcl_utility=>trans_object_2_xml( temp10 ).
+DATA ls_db LIKE temp11.
+ls_db = temp11.
 
-    MODIFY z2ui5_t_draft FROM @ls_db.
-    z2ui5_lcl_utility=>raise( when = xsdbool( sy-subrc <> 0 ) ).
+    MODIFY z2ui5_t_draft FROM ls_db.
+    z2ui5_lcl_utility=>raise( when = boolc( sy-subrc <> 0 ) ).
     COMMIT WORK AND WAIT.
 
   ENDMETHOD.
@@ -1229,17 +1408,17 @@ CLASS z2ui5_lcl_fw_db IMPLEMENTATION.
 
       SELECT SINGLE *
         FROM z2ui5_t_draft
-        WHERE uuid = @id
-      INTO @result.
-      z2ui5_lcl_utility=>raise( when = xsdbool( sy-subrc <> 0 ) ).
+      INTO result
+      WHERE uuid = id.
+      z2ui5_lcl_utility=>raise( when = boolc( sy-subrc <> 0 ) ).
 
     ELSE.
 
-      SELECT SINGLE uuid, uuid_prev, uuid_prev_app, uuid_prev_app_stack
+      SELECT SINGLE uuid uuid_prev uuid_prev_app uuid_prev_app_stack
         FROM z2ui5_t_draft
-        WHERE uuid = @id
-      INTO CORRESPONDING FIELDS OF @result.
-      z2ui5_lcl_utility=>raise( when = xsdbool( sy-subrc <> 0 ) ).
+        INTO CORRESPONDING FIELDS OF result
+        WHERE uuid = id.
+      z2ui5_lcl_utility=>raise( when = boolc( sy-subrc <> 0 ) ).
 
     ENDIF.
 
@@ -1249,13 +1428,14 @@ CLASS z2ui5_lcl_fw_db IMPLEMENTATION.
 
     DATA lv_timestampl TYPE timestampl.
 
-    DATA(lv_time) = sy-uzeit.
+    DATA lv_time LIKE sy-uzeit.
+    lv_time = sy-uzeit.
     lv_time = lv_time - ( 60 * 60 * 4 ).
 
     CONVERT DATE sy-datum TIME lv_time
        INTO TIME STAMP lv_timestampl TIME ZONE sy-zonlo.
 
-    DELETE FROM z2ui5_t_draft WHERE timestampl < @lv_timestampl.
+    DELETE FROM z2ui5_t_draft WHERE timestampl < lv_timestampl.
     COMMIT WORK.
 
   ENDMETHOD.
@@ -1283,7 +1463,8 @@ CLASS z2ui5_lcl_fw_handler IMPLEMENTATION.
     mo_body = z2ui5_lcl_utility_tree_json=>factory( z2ui5_cl_http_handler=>client-body ).
 
     TRY.
-        DATA(lv_id_prev) = mo_body->get_attribute( `ID` )->get_val( ).
+        DATA lv_id_prev TYPE string.
+        lv_id_prev = mo_body->get_attribute( `ID` )->get_val( ).
       CATCH cx_root.
         result = set_app_start( ).
         RETURN.
@@ -1297,15 +1478,18 @@ CLASS z2ui5_lcl_fw_handler IMPLEMENTATION.
   METHOD request_end.
 
     IF ms_next-s_set-path IS NOT INITIAL.
-      DATA(lv_path) = z2ui5_lcl_utility=>get_header_val( '~path' ).
-      DATA(lv_path_info) = z2ui5_lcl_utility=>get_header_val( '~path_info' ).
+      DATA lv_path TYPE z2ui5_if_client=>ty_s_name_value-value.
+      lv_path = z2ui5_lcl_utility=>get_header_val( '~path' ).
+      DATA lv_path_info TYPE z2ui5_if_client=>ty_s_name_value-value.
+      lv_path_info = z2ui5_lcl_utility=>get_header_val( '~path_info' ).
       REPLACE lv_path_info IN lv_path WITH ``.
       SHIFT lv_path RIGHT DELETING TRAILING `/`.
       SHIFT lv_path LEFT DELETING LEADING ` `.
       ms_next-s_set-path = lv_path && ms_next-s_set-path.
     ENDIF.
 
-    DATA(lo_resp) = z2ui5_lcl_utility_tree_json=>factory( ).
+    DATA lo_resp TYPE REF TO z2ui5_lcl_utility_tree_json.
+    lo_resp = z2ui5_lcl_utility_tree_json=>factory( ).
     lo_resp->add_attribute( n = `PARAMS` v = z2ui5_lcl_utility=>trans_any_2_json( ms_next-s_set ) apos_active = abap_false ).
     lo_resp->add_attribute( n = `S_MSG`  v = z2ui5_lcl_utility=>trans_any_2_json( ms_next-s_msg ) apos_active = abap_false ).
     lo_resp->add_attribute( n = `ID`   v = ms_db-id ).
@@ -1320,26 +1504,34 @@ CLASS z2ui5_lcl_fw_handler IMPLEMENTATION.
 
     CONSTANTS c_prefix TYPE string VALUE `LO_APP->`.
 
-    result = NEW #( ).
+    CREATE OBJECT result.
     result->ms_db-id = z2ui5_lcl_utility=>get_uuid( ).
-    DATA(lv_id) = result->ms_db-id.
+    DATA lv_id LIKE result->ms_db-id.
+    lv_id = result->ms_db-id.
     result->ms_db = z2ui5_lcl_fw_db=>load_app( id_prev ).
     result->ms_db-id = lv_id.
     result->ms_db-id_prev = id_prev.
 
-    DATA(lo_app) = CAST object( result->ms_db-o_app ) ##NEEDED.
+    DATA temp11 TYPE REF TO object.
+    temp11 ?= result->ms_db-o_app.
+    DATA lo_app LIKE temp11.
+    lo_app = temp11.
 
     TRY.
 
-        DATA(lo_model) = mo_body->get_attribute( `OUPDATE` ).
+        DATA lo_model TYPE REF TO z2ui5_lcl_utility_tree_json.
+        lo_model = mo_body->get_attribute( `OUPDATE` ).
 
-        LOOP AT result->ms_db-t_attri REFERENCE INTO DATA(lr_attri)
+        DATA temp12 LIKE LINE OF result->ms_db-t_attri.
+        DATA lr_attri LIKE REF TO temp12.
+        LOOP AT result->ms_db-t_attri REFERENCE INTO lr_attri
             WHERE bind_type = cs_bind_type-two_way.
 
           FIELD-SYMBOLS <attribute> TYPE any.
-          DATA(lv_name) = c_prefix && to_upper( lr_attri->name ).
+          DATA lv_name TYPE string.
+          lv_name = c_prefix && to_upper( lr_attri->name ).
           ASSIGN (lv_name) TO <attribute>.
-          z2ui5_lcl_utility=>raise( when = xsdbool( sy-subrc <> 0 ) ).
+          z2ui5_lcl_utility=>raise( when = boolc( sy-subrc <> 0 ) ).
 
           IF lr_attri->gen_kind IS NOT INITIAL.
 
@@ -1350,7 +1542,8 @@ CLASS z2ui5_lcl_fw_handler IMPLEMENTATION.
               WHEN cl_abap_datadescr=>kind_table.
                 DATA lr_data TYPE REF TO data.
                 CREATE DATA lr_data TYPE (lr_attri->gen_type).
-                ASSIGN lr_data->* TO FIELD-SYMBOL(<field>).
+                FIELD-SYMBOLS <field> TYPE any.
+                ASSIGN lr_data->* TO <field>.
                 CREATE DATA <attribute> LIKE STANDARD TABLE OF <field>.
                 ASSIGN <attribute>->* TO <attribute>.
             ENDCASE.
@@ -1365,7 +1558,8 @@ CLASS z2ui5_lcl_fw_handler IMPLEMENTATION.
 
             WHEN OTHERS.
 
-              DATA(lo_attri) = lo_model->get_attribute( lr_attri->name ).
+              DATA lo_attri TYPE REF TO z2ui5_lcl_utility_tree_json.
+              lo_attri = lo_model->get_attribute( lr_attri->name ).
               FIELD-SYMBOLS <val> TYPE any.
               ASSIGN lo_attri->mr_actual->* TO <val>.
 
@@ -1401,7 +1595,8 @@ CLASS z2ui5_lcl_fw_handler IMPLEMENTATION.
     ENDTRY.
 
     TRY.
-        DATA(lo_scroll) = mo_body->get_attribute( `OSCROLL` ).
+        DATA lo_scroll TYPE REF TO z2ui5_lcl_utility_tree_json.
+        lo_scroll = mo_body->get_attribute( `OSCROLL` ).
         z2ui5_lcl_utility=>trans_ref_tab_2_tab(
             EXPORTING ir_tab_from = lo_scroll->mr_actual
             IMPORTING t_result    = result->ms_actual-t_scroll_pos ).
@@ -1413,16 +1608,19 @@ CLASS z2ui5_lcl_fw_handler IMPLEMENTATION.
 
   METHOD set_app_start.
 
-    result = NEW #( ).
+    CREATE OBJECT result.
     result->ms_db-id = z2ui5_lcl_utility=>get_uuid( ).
 
     TRY.
-        DATA(lv_path_info) = z2ui5_lcl_utility=>get_header_val( '~path_info' ).
+        DATA lv_path_info TYPE z2ui5_if_client=>ty_s_name_value-value.
+        lv_path_info = z2ui5_lcl_utility=>get_header_val( '~path_info' ).
       CATCH cx_root.
     ENDTRY.
 
-    SPLIT lv_path_info AT `?` INTO lv_path_info DATA(lv_dummy).
-    DATA(lv_classname) = z2ui5_lcl_utility=>get_trim_upper( lv_path_info ).
+    DATA lv_dummy TYPE string.
+    SPLIT lv_path_info AT `?` INTO lv_path_info lv_dummy.
+    DATA lv_classname TYPE string.
+    lv_classname = z2ui5_lcl_utility=>get_trim_upper( lv_path_info ).
     SHIFT lv_classname LEFT DELETING LEADING `/`.
 
     IF lv_classname IS INITIAL.
@@ -1451,13 +1649,14 @@ CLASS z2ui5_lcl_fw_handler IMPLEMENTATION.
 
   METHOD set_app_leave.
 
-    result = NEW #( ).
+    CREATE OBJECT result.
 
     result->ms_db-o_app = ms_next-o_call_app.
 
     z2ui5_lcl_fw_db=>create( id = ms_db-id db = ms_db ).
 
-    DATA(ls_draft) = z2ui5_lcl_fw_db=>read( id = result->ms_db-o_app->id check_load_app = abap_false ).
+    DATA ls_draft TYPE z2ui5_t_draft.
+    ls_draft = z2ui5_lcl_fw_db=>read( id = result->ms_db-o_app->id check_load_app = abap_false ).
     result->ms_db-id_prev_app_stack = ls_draft-uuid_prev_app_stack.
 
     result->ms_db-t_attri     = z2ui5_lcl_utility=>get_t_attri_by_ref( result->ms_db-o_app ).
@@ -1475,7 +1674,7 @@ CLASS z2ui5_lcl_fw_handler IMPLEMENTATION.
 
     z2ui5_lcl_fw_db=>create( id = ms_db-id db = ms_db ).
 
-    result = NEW #( ).
+    CREATE OBJECT result.
     result->ms_db-id        = z2ui5_lcl_utility=>get_uuid( ).
     result->ms_db-o_app     = ms_next-o_call_app.
     result->ms_db-o_app->id = result->ms_db-id.
@@ -1494,28 +1693,37 @@ CLASS z2ui5_lcl_fw_handler IMPLEMENTATION.
 
     CONSTANTS c_prefix TYPE string VALUE `LO_APP->`.
 
-    DATA(lo_app) = CAST object( ms_db-o_app ) ##NEEDED.
+    DATA temp13 TYPE REF TO object.
+    temp13 ?= ms_db-o_app.
+    DATA lo_app LIKE temp13.
+    lo_app = temp13.
 
     IF type = cs_bind_type-one_time.
-      DATA(lv_id) = z2ui5_lcl_utility=>get_uuid_session( ).
-      INSERT VALUE #(
-        name = lv_id
-        data_stringify = z2ui5_lcl_utility=>trans_any_2_json( value )
-        bind_type = type
-       ) INTO TABLE ms_db-t_attri.
+      DATA lv_id TYPE string.
+      lv_id = z2ui5_lcl_utility=>get_uuid_session( ).
+      DATA temp14 TYPE z2ui5_lcl_utility=>ty_attri.
+      CLEAR temp14.
+      temp14-name = lv_id.
+      temp14-data_stringify = z2ui5_lcl_utility=>trans_any_2_json( value ).
+      temp14-bind_type = type.
+      INSERT temp14 INTO TABLE ms_db-t_attri.
       result = |/{ lv_id }|.
       RETURN.
     ENDIF.
 
-    DATA(lr_in) = REF #( value ).
+    DATA lr_in type REF TO data.
+    GET REFERENCE OF value INTO lr_in.
 
-    LOOP AT ms_db-t_attri REFERENCE INTO DATA(lr_attri)
+    DATA temp15 LIKE LINE OF ms_db-t_attri.
+    DATA lr_attri LIKE REF TO temp15.
+    LOOP AT ms_db-t_attri REFERENCE INTO lr_attri
         WHERE bind_type <> cs_bind_type-one_time.
 
       FIELD-SYMBOLS <attribute> TYPE any.
-      DATA(lv_name) = c_prefix && to_upper( lr_attri->name ).
+      DATA lv_name TYPE string.
+      lv_name = c_prefix && to_upper( lr_attri->name ).
       ASSIGN (lv_name) TO <attribute>.
-      z2ui5_lcl_utility=>raise( when = xsdbool( sy-subrc <> 0 ) v = `Attribute in App with name ` && lv_name && ` not found` ).
+      z2ui5_lcl_utility=>raise( when = boolc( sy-subrc <> 0 ) v = `Attribute in App with name ` && lv_name && ` not found` ).
       DATA lr_ref TYPE REF TO data.
       GET REFERENCE OF  <attribute> INTO lr_ref.
 
@@ -1523,19 +1731,27 @@ CLASS z2ui5_lcl_fw_handler IMPLEMENTATION.
         TRY.
             FIELD-SYMBOLS <field> TYPE any.
             ASSIGN lr_ref->* TO <field>.
-            lr_ref = CAST data( <field> ).
+            DATA temp16 TYPE REF TO data.
+            temp16 ?= <field>.
+            lr_ref = temp16.
             IF lr_attri->gen_type IS INITIAL.
               FIELD-SYMBOLS <field2> TYPE any.
               ASSIGN lr_ref->* TO <field2>.
-              DATA(lo_datadescr) = cl_abap_datadescr=>describe_by_data( <field2> ).
+              DATA lo_datadescr TYPE REF TO cl_abap_typedescr.
+              lo_datadescr = cl_abap_datadescr=>describe_by_data( <field2> ).
               lr_attri->gen_type_kind = lo_datadescr->type_kind.
               lr_attri->gen_kind = lo_datadescr->kind.
               CASE lo_datadescr->kind.
                 WHEN lo_datadescr->kind_elem.
-                  SPLIT lo_datadescr->absolute_name AT '=' INTO DATA(lv_dummy)  lr_attri->gen_type.
+                  DATA lv_dummy TYPE string.
+                  SPLIT lo_datadescr->absolute_name AT '=' INTO lv_dummy  lr_attri->gen_type.
                 WHEN lo_datadescr->kind_table.
-                  DATA(lo_tab) = CAST cl_abap_tabledescr( lo_datadescr  ).
-                  DATA(lo_struc) = lo_tab->get_table_line_type( ).
+                  DATA temp17 TYPE REF TO cl_abap_tabledescr.
+                  temp17 ?= lo_datadescr.
+                  DATA lo_tab LIKE temp17.
+                  lo_tab = temp17.
+                  DATA lo_struc TYPE REF TO cl_abap_datadescr.
+                  lo_struc = lo_tab->get_table_line_type( ).
                   SPLIT lo_struc->absolute_name AT '=' INTO lv_dummy lr_attri->gen_type.
               ENDCASE.
             ENDIF.
@@ -1549,7 +1765,13 @@ CLASS z2ui5_lcl_fw_handler IMPLEMENTATION.
           z2ui5_lcl_utility=>raise( `Binding Error - two diffferent binding types for same attribute (` && lr_attri->name && `) used` ).
         ENDIF.
         lr_attri->bind_type = type.
-        result = COND #( WHEN type = cs_bind_type-two_way THEN `/oUpdate/` ELSE `/` ) && lr_attri->name.
+        DATA temp18 TYPE string.
+        IF type = cs_bind_type-two_way.
+          temp18 = `/oUpdate/`.
+        ELSE.
+          temp18 = `/`.
+        ENDIF.
+        result = temp18 && lr_attri->name.
         RETURN.
       ENDIF.
 
@@ -1561,11 +1783,12 @@ CLASS z2ui5_lcl_fw_handler IMPLEMENTATION.
 
     "one time when not global class attribute
     lv_id = z2ui5_lcl_utility=>get_uuid_session( ).
-    INSERT VALUE #(
-      name = lv_id
-      data_stringify = z2ui5_lcl_utility=>trans_any_2_json( value )
-      bind_type = cs_bind_type-one_time
-     ) INTO TABLE ms_db-t_attri.
+    DATA temp19 TYPE z2ui5_lcl_utility=>ty_attri.
+    CLEAR temp19.
+    temp19-name = lv_id.
+    temp19-data_stringify = z2ui5_lcl_utility=>trans_any_2_json( value ).
+    temp19-bind_type = cs_bind_type-one_time.
+    INSERT temp19 INTO TABLE ms_db-t_attri.
     result = |/{ lv_id }|.
 
   ENDMETHOD.
@@ -1577,11 +1800,11 @@ CLASS z2ui5_lcl_fw_handler IMPLEMENTATION.
       z2ui5_lcl_fw_db=>create( id = ms_db-id db = ms_db ).
     ENDIF.
 
-    result = NEW #( ).
+    CREATE OBJECT result.
     result->ms_db-id = z2ui5_lcl_utility=>get_uuid( ).
 
     IF ix IS NOT BOUND AND error_text IS NOT INITIAL.
-      ix = NEW z2ui5_lcl_utility( val = error_text ).
+      CREATE OBJECT ix TYPE z2ui5_lcl_utility EXPORTING val = error_text.
     ENDIF.
 
     IF ix IS BOUND.
@@ -1595,7 +1818,7 @@ CLASS z2ui5_lcl_fw_handler IMPLEMENTATION.
       result->ms_db-id_prev_app = ms_db-id.
 
     ELSE.
-      result->ms_db-o_app = NEW z2ui5_lcl_fw_app( ).
+      CREATE OBJECT result->ms_db-o_app TYPE z2ui5_lcl_fw_app.
     ENDIF.
 
     result->ms_db-t_attri = z2ui5_lcl_utility=>get_t_attri_by_ref( result->ms_db-o_app ).
@@ -1608,26 +1831,38 @@ CLASS z2ui5_lcl_fw_handler IMPLEMENTATION.
 
     CONSTANTS c_prefix TYPE string VALUE `LO_APP->`.
 
-    DATA(lo_app) = CAST object( ms_db-o_app ) ##NEEDED.
+    DATA temp20 TYPE REF TO object.
+    temp20 ?= ms_db-o_app.
+    DATA lo_app LIKE temp20.
+    lo_app = temp20.
     r_view_model  = z2ui5_lcl_utility_tree_json=>factory( ).
     r_view_model->mv_name = `oViewModel`.
-    DATA(lo_update) = r_view_model->add_attribute_object( `oUpdate` ).
+    DATA lo_update TYPE REF TO z2ui5_lcl_utility_tree_json.
+    lo_update = r_view_model->add_attribute_object( `oUpdate` ).
 
-    LOOP AT ms_db-t_attri REFERENCE INTO DATA(lr_attri) WHERE bind_type <> ``.
+    DATA temp21 LIKE LINE OF ms_db-t_attri.
+    DATA lr_attri LIKE REF TO temp21.
+    LOOP AT ms_db-t_attri REFERENCE INTO lr_attri WHERE bind_type <> ``.
 
       IF lr_attri->bind_type = cs_bind_type-one_time.
         r_view_model->add_attribute( n = lr_attri->name v = lr_attri->data_stringify apos_active = abap_false ).
         CONTINUE.
       ENDIF.
 
-      DATA(lo_actual) = COND #( WHEN lr_attri->bind_type = cs_bind_type-one_way
-        THEN r_view_model
-        ELSE lo_update ).
+      DATA temp22 TYPE REF TO z2ui5_lcl_utility_tree_json.
+      IF lr_attri->bind_type = cs_bind_type-one_way.
+        temp22 = r_view_model.
+      ELSE.
+        temp22 = lo_update.
+      ENDIF.
+      DATA lo_actual LIKE temp22.
+      lo_actual = temp22.
 
       FIELD-SYMBOLS <attribute> TYPE any.
-      DATA(lv_name) = c_prefix && to_upper( lr_attri->name ).
+      DATA lv_name TYPE string.
+      lv_name = c_prefix && to_upper( lr_attri->name ).
       ASSIGN (lv_name) TO <attribute>.
-      z2ui5_lcl_utility=>raise( when = xsdbool( sy-subrc <> 0 ) ).
+      z2ui5_lcl_utility=>raise( when = boolc( sy-subrc <> 0 ) ).
 
       IF lr_attri->gen_kind IS NOT INITIAL.
         lv_name = '<ATTRIBUTE>->*'.
@@ -1648,9 +1883,16 @@ CLASS z2ui5_lcl_fw_handler IMPLEMENTATION.
 
             WHEN `ABAP_BOOL` OR `ABAP_BOOLEAN` OR `XSDBOOLEAN`.
 
+              DATA temp23 TYPE string.
+              CASE <attribute>.
+                WHEN abap_true.
+                  temp23 = `true`.
+                WHEN OTHERS.
+                  temp23 = `false`.
+              ENDCASE.
               lo_actual->add_attribute(
                  n = lr_attri->name
-                 v = SWITCH #( <attribute> WHEN abap_true THEN `true` ELSE `false` )
+                 v = temp23
                  apos_active = abap_false ).
 
             WHEN OTHERS.
@@ -1679,44 +1921,46 @@ CLASS z2ui5_lcl_fw_client IMPLEMENTATION.
 
   METHOD z2ui5_if_client~popup_message_toast.
 
-    mo_handler->ms_next-s_msg =  VALUE #(
-        control = `MessageToast`
-        type    = `show`
-        text    = text
-    ).
+    CLEAR mo_handler->ms_next-s_msg.
+    mo_handler->ms_next-s_msg-control = `MessageToast`.
+    mo_handler->ms_next-s_msg-type = `show`.
+    mo_handler->ms_next-s_msg-text = text.
 
   ENDMETHOD.
 
 
   METHOD z2ui5_if_client~popup_message_box.
 
-    mo_handler->ms_next-s_msg =  VALUE #(
-        control = `MessageBox`
-        type    = type
-        text    = text
-    ).
+    CLEAR mo_handler->ms_next-s_msg.
+    mo_handler->ms_next-s_msg-control = `MessageBox`.
+    mo_handler->ms_next-s_msg-type = type.
+    mo_handler->ms_next-s_msg-text = text.
 
   ENDMETHOD.
 
 
   METHOD z2ui5_if_client~nav_app_home.
 
-    z2ui5_if_client~nav_app_call( NEW z2ui5_lcl_fw_app( ) ).
+    DATA temp31 TYPE REF TO z2ui5_lcl_fw_app.
+    CREATE OBJECT temp31 TYPE z2ui5_lcl_fw_app.
+    z2ui5_if_client~nav_app_call( temp31 ).
 
   ENDMETHOD.
 
 
   METHOD z2ui5_if_client~get.
 
-    result = VALUE #( BASE CORRESPONDING #( mo_handler->ms_db )
-         event             = mo_handler->ms_actual-event
-         event_data        = mo_handler->ms_actual-event_data
-         event_data2       = mo_handler->ms_actual-event_data2
-         event_data3       = mo_handler->ms_actual-event_data3
-         t_scroll_pos      = mo_handler->ms_actual-t_scroll_pos
-         t_req_header      = z2ui5_cl_http_handler=>client-t_header
-         t_req_param       = z2ui5_cl_http_handler=>client-t_param
-     ).
+    DATA temp32 TYPE z2ui5_if_client=>ty_s_get.
+    CLEAR temp32.
+    MOVE-CORRESPONDING mo_handler->ms_db TO temp32.
+    temp32-event = mo_handler->ms_actual-event.
+    temp32-event_data = mo_handler->ms_actual-event_data.
+    temp32-event_data2 = mo_handler->ms_actual-event_data2.
+    temp32-event_data3 = mo_handler->ms_actual-event_data3.
+    temp32-t_scroll_pos = mo_handler->ms_actual-t_scroll_pos.
+    temp32-t_req_header = z2ui5_cl_http_handler=>client-t_header.
+    temp32-t_req_param = z2ui5_cl_http_handler=>client-t_param.
+    result = temp32.
 
   ENDMETHOD.
 
@@ -1757,19 +2001,22 @@ CLASS z2ui5_lcl_fw_client IMPLEMENTATION.
   METHOD z2ui5_if_client~_event.
 
     IF data IS INITIAL.
-      DATA(lv_data) = `''`.
+      DATA lv_data TYPE string.
+      lv_data = `''`.
     ELSE.
       lv_data = data.
     ENDIF.
 
        IF data2 IS INITIAL.
-      DATA(lv_data2) = `''`.
+      DATA lv_data2 TYPE string.
+      lv_data2 = `''`.
     ELSE.
       lv_data2 = data2.
     ENDIF.
 
        IF data3 IS INITIAL.
-      DATA(lv_data3) = `''`.
+      DATA lv_data3 TYPE string.
+      lv_data3 = `''`.
     ELSE.
       lv_data3 = data3.
     ENDIF.
@@ -1794,7 +2041,9 @@ CLASS z2ui5_lcl_fw_client IMPLEMENTATION.
 
   METHOD z2ui5_if_client~get_app.
 
-    result = CAST #( z2ui5_lcl_fw_db=>load_app( id )-o_app ).
+    DATA temp33 TYPE REF TO z2ui5_if_app.
+    temp33 ?= z2ui5_lcl_fw_db=>load_app( id )-o_app.
+    result = temp33.
 
   ENDMETHOD.
 

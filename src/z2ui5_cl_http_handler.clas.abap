@@ -40,21 +40,37 @@ CLASS Z2UI5_CL_HTTP_HANDLER IMPLEMENTATION.
 
   METHOD http_get.
 
-    DATA(lt_Config) = t_config.
+    DATA lt_Config LIKE t_config.
+    lt_Config = t_config.
 
     IF lt_config IS INITIAL.
-      lt_config = VALUE #(
-        (  name = `data-sap-ui-theme`         value = `sap_horizon` )
-        (  name = `src`                       value = `https://sdk.openui5.org/resources/sap-ui-core.js` )
-        (  name = `data-sap-ui-libs`          value = `sap.m` )
-        (  name = `data-sap-ui-bindingSyntax` value = `complex` )
-        (  name = `data-sap-ui-frameOptions`  value = `trusted` )
-        (  name = `data-sap-ui-compatVersion` value = `edge` )
-          ).
+      DATA temp1 TYPE z2ui5_if_client=>ty_t_name_value.
+      CLEAR temp1.
+      DATA temp2 LIKE LINE OF temp1.
+      temp2-name = `data-sap-ui-theme`.
+      temp2-value = `sap_horizon`.
+      INSERT temp2 INTO TABLE temp1.
+      temp2-name = `src`.
+      temp2-value = `https://sdk.openui5.org/resources/sap-ui-core.js`.
+      INSERT temp2 INTO TABLE temp1.
+      temp2-name = `data-sap-ui-libs`.
+      temp2-value = `sap.m`.
+      INSERT temp2 INTO TABLE temp1.
+      temp2-name = `data-sap-ui-bindingSyntax`.
+      temp2-value = `complex`.
+      INSERT temp2 INTO TABLE temp1.
+      temp2-name = `data-sap-ui-frameOptions`.
+      temp2-value = `trusted`.
+      INSERT temp2 INTO TABLE temp1.
+      temp2-name = `data-sap-ui-compatVersion`.
+      temp2-value = `edge`.
+      INSERT temp2 INTO TABLE temp1.
+      lt_config = temp1.
     ENDIF.
 
     IF content_security_policy IS NOT SUPPLIED.
-      DATA(lv_sec_policy) = `<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: ` &&
+      DATA lv_sec_policy TYPE string.
+      lv_sec_policy = `<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: ` &&
         `ui5.sap.com *.ui5.sap.com sapui5.hana.ondemand.com *.sapui5.hana.ondemand.com sdk.openui5.org *.sdk.openui5.org cdn.jsdelivr.net *.cdn.jsdelivr.net"/>`.
     ELSE.
       lv_sec_policy = content_security_policy.
@@ -75,7 +91,9 @@ CLASS Z2UI5_CL_HTTP_HANDLER IMPLEMENTATION.
                `    </style> ` &&
                `    <script id="sap-ui-bootstrap"`.
 
-    LOOP AT lt_config REFERENCE INTO DATA(lr_config).
+    DATA temp3 LIKE LINE OF lt_config.
+    DATA lr_config LIKE REF TO temp3.
+    LOOP AT lt_config REFERENCE INTO lr_config.
       r_result = r_result && | { lr_config->name }="{ lr_config->value }"|.
     ENDLOOP.
 
@@ -293,12 +311,17 @@ CLASS Z2UI5_CL_HTTP_HANDLER IMPLEMENTATION.
 
   METHOD http_post.
 
-    DATA(lo_handler) = z2ui5_lcl_fw_handler=>request_begin(  ).
+    DATA lo_handler TYPE REF TO z2ui5_lcl_fw_handler.
+    lo_handler = z2ui5_lcl_fw_handler=>request_begin(  ).
 
     DO.
       TRY.
           ROLLBACK WORK.
-          CAST z2ui5_if_app( lo_handler->ms_db-o_app )->main( NEW z2ui5_lcl_fw_client( lo_handler ) ).
+          DATA temp4 TYPE REF TO z2ui5_if_app.
+          temp4 ?= lo_handler->ms_db-o_app.
+          DATA temp1 TYPE REF TO z2ui5_lcl_fw_client.
+          CREATE OBJECT temp1 TYPE z2ui5_lcl_fw_client EXPORTING HANDLER = lo_handler.
+          temp4->main( temp1 ).
           ROLLBACK WORK.
 
           IF lo_handler->ms_next-check_app_leave IS NOT INITIAL.
@@ -313,7 +336,8 @@ CLASS Z2UI5_CL_HTTP_HANDLER IMPLEMENTATION.
 
           result = lo_handler->request_end( ).
 
-        CATCH cx_root INTO DATA(x).
+          DATA x TYPE REF TO cx_root.
+        CATCH cx_root INTO x.
           lo_handler = lo_handler->set_app_system( x ).
           CONTINUE.
       ENDTRY.
